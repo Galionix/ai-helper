@@ -6,6 +6,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsc-watch": "^6.2.0",
@@ -20,6 +22,8 @@
   "dependencies": {
     "@types/jquery": "^3.5.30",
     "expose-loader": "^5.0.0",
-    "jquery": "^3.7.1"
+    "idle-js": "^1.2.0",
+    "jquery": "^3.7.1",
+    "notyf": "^3.10.0"
   }
 }

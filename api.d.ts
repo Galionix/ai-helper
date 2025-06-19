@@ -25,3 +25,4 @@ declare function waitForKeyElements(
 
 declare function GM_setValue(name: string, value: any): void;
 declare function GM_getValue(name: string, defaultValue?: any): any;
+declare function GM_addStyle(style: string): any;
