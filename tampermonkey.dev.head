@@ -1,0 +1,14 @@
+// ==UserScript==
+// @name         ai helper
+// @namespace    http://tampermonkey.net/
+// @version      2025-06-19
+// @description  try to take over the world!
+// @author       Galionix
+// @match      *://*/*
+// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
+// @require     file://D:/projects/tampermonkey/ai-helper/build/ai-helper-bundle.js
+// @require  https://gist.github.com/raw/2625891/waitForKeyElements.js
+// @require            https://openuserjs.org/src/libs/sizzle/GM_config.js
+// @grant              GM_getValue
+// @grant              GM_setValue
+// ==/UserScript==

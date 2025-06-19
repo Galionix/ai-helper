@@ -1,0 +1,25 @@
+{
+  "name": "ai-helper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "tsc-watch": "^6.2.0",
+    "typescript": "^5.4.5",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "scripts": {
+    "build": "tsc",
+    "webpack:watch": "npx webpack -w"
+  },
+  "dependencies": {
+    "@types/jquery": "^3.5.30",
+    "expose-loader": "^5.0.0",
+    "jquery": "^3.7.1"
+  }
+}
