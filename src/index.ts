@@ -1,23 +1,7 @@
-// ==UserScript==
-// @name         AI Helper
-// @match        *://*/*
-// @grant        GM_addStyle
-// @grant        GM_getValue
-// @grant        GM_setValue
-// ==/UserScript==
-
-// import { Notyf } from "notyf";
-// import "notyf/notyf.min.css";
 import IdleJs from "idle-js";
 import { base64Audio } from "./audio";
 import { el } from "./el";
 import { showToast } from "./showToast";
-
-// const notyf = new Notyf({
-//   duration: 0,
-//   dismissible: true,
-//   position: { y: "top", x: "right" },
-// });
 
 const audio = new Audio(base64Audio);
 

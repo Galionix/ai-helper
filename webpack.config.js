@@ -1,4 +1,6 @@
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const webpack = require("webpack");
 
 module.exports = {
   mode: "development",
@@ -24,5 +26,12 @@ module.exports = {
         use: ['style-loader', 'css-loader'],
       },
     ]
-  }
+  },
+  plugins: [
+    new webpack.BannerPlugin({
+      banner: fs.readFileSync(path.resolve(__dirname, "tampermonkey.dev.head"), "utf8"),
+      raw: true,
+      entryOnly: true, // чтобы только в основном entry это попало
+    }),
+  ],
 };

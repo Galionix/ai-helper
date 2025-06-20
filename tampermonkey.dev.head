@@ -2,7 +2,7 @@
 // @name         ai helper
 // @namespace    http://tampermonkey.net/
 // @version      2025-06-19
-// @description  try to take over the world!
+// @description  watch your urls, affect wellbeing, process responses with ChatGpt, get notifications
 // @author       Galionix
 // @match      *://*/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
