@@ -25,9 +25,9 @@ const CSS = `
   #ai-helper-toggle {
     position: fixed; bottom: 20px; right: 20px; z-index: 999999;
     width: 48px; height: 48px; border-radius: 50%; font-size: 24px;
-    background: #007bff; color: white; border: none; cursor: pointer;
+    background:rgb(35, 51, 68); color: white; border: none; cursor: pointer;
   }
-  #ai-helper-widget { position: fixed; bottom: 80px; right: 20px; width: 320px; height: 400px;
+  #ai-helper-widget { position: fixed; bottom: 80px; right: 20px; width: 420px; height: 400px;
     background: #1e1e1e; color: white; border-radius: 12px; z-index: 999998;
     display: none; flex-direction: column; font-family: sans-serif; box-shadow: 0 0 20px rgba(0,0,0,0.5);
   }
@@ -38,6 +38,21 @@ const CSS = `
   #ai-helper-settings input, #ai-helper-settings textarea {
     width: 100%; padding: 6px; background: #333; color: white; border: 1px solid #555; margin-top: 5px;
   }
+    .chat-message {
+      border-radius: 5px;
+      padding: 5px;
+    }
+      .chat-message label {
+      font-size: 0.8em;
+      color: gray;
+      }
+    .ai-message {
+      border: 1px solid #517b79;
+    }
+    .user-message {
+      border: 1px solid #83794b;
+      text-align: end;
+    }
 `;
 
 GM_addStyle(CSS);
@@ -69,11 +84,23 @@ async function renderChat() {
   chat.slice(-50).forEach((msg) => {
     container.append(
       el("div", {
-        textContent: `[${msg.time}] ${msg.sender}: ${msg.text}`,
+        children: [
+          el('p', {
+            textContent: `${msg.text}`,
+          }),
+          el('label', {
+            textContent: msg.time,
+          })
+        ],
+
         style: { marginBottom: "4px", whiteSpace: "pre-wrap" },
+        className:
+          `chat-message ${msg.sender === "AI" ? "ai-message" : "user-message"}`,
       })
     );
   });
+  const lastMessage = container.lastElementChild;
+  if (lastMessage) lastMessage.scrollIntoView({ behavior: "instant" });
 }
 
 function createElements() {
@@ -82,6 +109,7 @@ function createElements() {
       el("button", {
         id: "ai-helper-toggle",
         textContent: "🤖",
+
         listeners: { click: toggleWidget },
       })
     );
@@ -97,11 +125,19 @@ function createElements() {
       placeholder:
         "Например: лечь спать до 23:00, не тратить время на соцсети...",
     });
+    const reminders = el("textarea", {
+      id: "ai-helper-reminders",
+      placeholder:
+        "Например: лечь спать до 23:00, не тратить время на соцсети...",
+    });
     const intervalInput = el("input", {
       id: "ai-helper-interval",
       placeholder: "Интервал уведомлений (мин)",
     });
-
+    const interval2Input = el("input", {
+      id: "ai-helper-interval2",
+      placeholder: "Интервал регулярных нфпоминаний (мин)",
+    });
     const messageInput = el("textarea", {
       id: "ai-helper-input",
       placeholder: "Введите сообщение...",
@@ -138,6 +174,9 @@ function createElements() {
 
     const widget = el("div", {
       id: "ai-helper-widget",
+      style: {
+        display: "none",
+      },
       children: [
         el("div", {
           id: "ai-helper-tabs",
@@ -180,8 +219,12 @@ function createElements() {
             input,
             el("label", { textContent: "Цели:" }),
             goals,
+            el("label", { textContent: "Напоминания:" }),
+            reminders,
             el("label", { textContent: "Интервал уведомлений (мин):" }),
             intervalInput,
+            el("label", { textContent: "Интервал напоминаний (мин):" }),
+            interval2Input,
           ],
         }),
         el("div", {
@@ -231,21 +274,22 @@ function createElements() {
       "change",
       async () => await GM_setValue("goals", goals.value)
     );
+    reminders.addEventListener(
+      "change",
+      async () => await GM_setValue("reminders", reminders.value)
+    );
     intervalInput.addEventListener("change", async () => {
       await GM_setValue("interval", parseInt(intervalInput.value || "5"));
-      // const raw = await GM_getValue("eventLog", "[]");
-      // const events: Event[] = JSON.parse(raw).slice(-5);
-      // const recent = events.map(e => `${e.domain} (${Math.round(e.duration / 1000)} сек в ${e.timestamp})`).join("\n");
-
-      // const advice = await getAdvice(GM_getValue("goals", ""), recent);
-      // console.log('advice: ', advice);
-      // showToast(advice );
-      // audio.play().catch(() => {});
+    });
+    interval2Input.addEventListener("change", async () => {
+      await GM_setValue("interval2", parseInt(interval2Input.value || "5"));
     });
 
     input.value = GM_getValue("openai_key", "");
     goals.value = GM_getValue("goals", "");
+    reminders.value = GM_getValue("reminders", "");
     intervalInput.value = GM_getValue("interval", 5);
+    interval2Input.value = GM_getValue("interval2", 5);
     // showToast("Добро пожаловать!");
   }
 }
@@ -253,6 +297,8 @@ function createElements() {
 function toggleWidget() {
   const widget = document.getElementById("ai-helper-widget");
   if (!widget) return;
+  renderChat();
+
   widget.style.display = widget.style.display === "none" ? "flex" : "none";
 }
 
@@ -293,6 +339,7 @@ let sessionStart = Date.now();
 let currentDomain = getDomain(location.href);
 
 async function logSessionEnd() {
+  console.log("user inactive");
   const duration = Date.now() - sessionStart;
   const now = new Date().toLocaleString();
   const raw = await GM_getValue("eventLog", "[]");
@@ -302,18 +349,22 @@ async function logSessionEnd() {
 }
 
 let lastAdviceTime = Date.now();
+let lastRemindTime = Date.now();
 async function getAdvice(goals: string, recentEvents: string) {
   const key = await GM_getValue("openai_key", "");
   if (!key) return "API ключ не задан";
   const messages = [
     {
       role: "system",
-      content:
-        "Ты персональный помощник, который анализирует поведение пользователя и напоминает ему о целях.",
+      content: goals,
     },
     {
       role: "user",
-      content: `Цели пользователя:\n${goals}\n\nНедавняя активность:\n${recentEvents}\nСейчас на странице\n${document.title}\nЧто стоит напомнить ему сейчас?`,
+      content:
+        `Недавняя активность:\n${recentEvents}\nСейчас пользователь на странице c заголовком: \n${document.title}\nЧто стоит напомнить ему сейчас?`.replaceAll(
+          "\n",
+          " "
+        ),
     },
   ];
   console.log("messages: ", messages);
@@ -339,7 +390,6 @@ async function maybeAdviseUser() {
   const interval = (await GM_getValue("interval", 5)) * 60000;
   const now = Date.now();
   if (now - lastAdviceTime > interval) {
-
     if (navigator.mediaSession.playbackState == "playing") {
       try {
         document.getElementsByTagName("video")[0].pause();
@@ -351,7 +401,7 @@ async function maybeAdviseUser() {
       } catch {
         console.log("there is no audio tag");
       }
-      navigator.mediaSession.playbackState = 'paused'
+      navigator.mediaSession.playbackState = "paused";
     }
 
     const raw = await GM_getValue("eventLog", "[]");
@@ -369,7 +419,41 @@ async function maybeAdviseUser() {
     lastAdviceTime = now;
   }
 }
+async function maybeRemindUser() {
+  const reminders = await GM_getValue("reminders", "");
+  if (!reminders) return;
+  const interval = (await GM_getValue("interval2", 5)) * 60000;
+  const now = Date.now();
+  if (now - lastRemindTime > interval) {
+    if (navigator.mediaSession.playbackState == "playing") {
+      try {
+        document.getElementsByTagName("video")[0].pause();
+      } catch {
+        console.log("there is no video tag");
+      }
+      try {
+        document.getElementsByTagName("audio")[0].pause();
+      } catch {
+        console.log("there is no audio tag");
+      }
+      navigator.mediaSession.playbackState = "paused";
+    }
 
+    const raw = await GM_getValue("eventLog", "[]");
+    const events: Event[] = JSON.parse(raw).slice(-5);
+    const recent = events
+      .map(
+        (e) =>
+          `${e.domain} (${Math.round(e.duration / 1000)} сек в ${e.timestamp})`
+      )
+      .join("\n");
+    const advice = await getAdvice(reminders, recent);
+    showToast(advice);
+    audio.play().catch(() => {});
+    await addChatMessage("AI", advice);
+    lastRemindTime = now;
+  }
+}
 (function () {
   if (window.top !== window.self) return;
   const idle = new IdleJs({
@@ -377,6 +461,7 @@ async function maybeAdviseUser() {
     events: ["mousemove", "keydown", "mousedown", "touchstart", "scroll"],
     onIdle: logSessionEnd,
     onActive: () => {
+      console.log("user active");
       sessionStart = Date.now();
       currentDomain = getDomain(location.href);
     },
@@ -401,17 +486,19 @@ async function maybeAdviseUser() {
       lastUrl = location.href;
       sessionStart = Date.now();
       currentDomain = getDomain(location.href);
-      createElements();
+      // createElements();
     }
     console.log("maybeAdviseUser called ");
     console.log("document.hasFocus: ", document.hasFocus());
+    if (document.hasFocus()) {
+      maybeRemindUser();
+    }
     if (
-      !document.hasFocus() &&
-      navigator.mediaSession.playbackState !== "playing"
-    )
-      return;
-
-    maybeAdviseUser();
+      // document.hasFocus()
+      navigator.mediaSession.playbackState == "playing"
+    ) {
+      maybeAdviseUser();
+    }
   }, 10000);
 })();
 
