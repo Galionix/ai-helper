@@ -6,39 +6,22 @@
 // @grant        GM_setValue
 // ==/UserScript==
 
-import { Notyf } from "notyf";
-import "notyf/notyf.min.css";
+// import { Notyf } from "notyf";
+// import "notyf/notyf.min.css";
 import IdleJs from "idle-js";
+import { base64Audio } from './audio';
+import { el } from './el';
+import { showToast } from './showToast';
 
-const notyf = new Notyf({
-  duration: 0,
-  dismissible: true,
-  position: { y: "top", x: "right" },
-});
+// const notyf = new Notyf({
+//   duration: 0,
+//   dismissible: true,
+//   position: { y: "top", x: "right" },
+// });
 
-const audio = new Audio("https://proxy.notificationsounds.com/notification-sounds/confident-543/download/file-sounds-1083-confident.mp3");
+const audio = new Audio(base64Audio);
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, options: {
-  id?: string,
-  className?: string,
-  textContent?: string,
-  placeholder?: string,
-  dataset?: Record<string, string>,
-  children?: HTMLElement[],
-  listeners?: Record<string, EventListenerOrEventListenerObject>,
-  style?: Partial<CSSStyleDeclaration>,
-} = {}): HTMLElementTagNameMap[K] {
-  const element = document.createElement(tag);
-  if (options.id) element.id = options.id;
-  if (options.className) element.className = options.className;
-  if (options.textContent) element.textContent = options.textContent;
-  if (options.placeholder) (element as HTMLInputElement).placeholder = options.placeholder;
-  if (options.dataset) Object.entries(options.dataset).forEach(([k, v]) => element.dataset[k] = v);
-  if (options.children) element.append(...options.children);
-  if (options.listeners) Object.entries(options.listeners).forEach(([k, v]) => element.addEventListener(k, v));
-  if (options.style) Object.assign(element.style, options.style);
-  return element;
-}
+
 
 const CSS = `
   #ai-helper-toggle {
@@ -66,7 +49,7 @@ async function addChatMessage(sender:string, text:string) {
   const chat = JSON.parse(raw);
   console.log('chat: ', chat);
   chat.push({ sender, text, time: new Date().toLocaleTimeString() });
-  await GM_setValue("chat", JSON.stringify(chat));
+  await GM_setValue("chat", JSON.stringify(chat.slice(-50)));
   renderChat();
 }
 type Message = {
@@ -187,7 +170,7 @@ function createElements() {
         tab.classList.add("active");
         widget.querySelector(`#ai-helper-${name}`)?.setAttribute("style", "display:block");
         if (name === "stats") {
-          if (wasActive) notyf.success("Статистика обновлена");
+          if (wasActive) showToast("Статистика обновлена");
           renderStats();
         } else if (name === "chat") {
           renderChat();
@@ -197,12 +180,24 @@ function createElements() {
 
     input.addEventListener("change", async () => await GM_setValue("openai_key", input.value));
     goals.addEventListener("change", async () => await GM_setValue("goals", goals.value));
-    intervalInput.addEventListener("change", async () => await GM_setValue("interval", parseInt(intervalInput.value || "5")));
+    intervalInput.addEventListener("change", async () => {
+
+      await GM_setValue("interval", parseInt(intervalInput.value || "5"))
+      // const raw = await GM_getValue("eventLog", "[]");
+      // const events: Event[] = JSON.parse(raw).slice(-5);
+      // const recent = events.map(e => `${e.domain} (${Math.round(e.duration / 1000)} сек в ${e.timestamp})`).join("\n");
+
+      // const advice = await getAdvice(GM_getValue("goals", ""), recent);
+      // console.log('advice: ', advice);
+      // showToast(advice );
+      // audio.play().catch(() => {});
+
+    });
 
     input.value = GM_getValue("openai_key", "");
     goals.value = GM_getValue("goals", "");
     intervalInput.value = GM_getValue("interval", 5);
-    notyf.success("Добро пожаловать!");
+    showToast("Добро пожаловать!");
   }
 }
 
@@ -255,8 +250,9 @@ async function getAdvice(goals: string, recentEvents: string) {
   if (!key) return "API ключ не задан";
   const messages = [
     { role: "system", content: "Ты персональный помощник, который анализирует поведение пользователя и напоминает ему о целях." },
-    { role: "user", content: `Цели пользователя:\n${goals}\n\nНедавняя активность:\n${recentEvents}\n\nЧто стоит напомнить ему сейчас?` }
+    { role: "user", content: `Цели пользователя:\n${goals}\n\nНедавняя активность:\n${recentEvents}\nСейчас на странице\n${document.title}\nЧто стоит напомнить ему сейчас?` }
   ];
+  console.log('messages: ', messages);
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -279,7 +275,7 @@ async function maybeAdviseUser() {
     const events: Event[] = JSON.parse(raw).slice(-5);
     const recent = events.map(e => `${e.domain} (${Math.round(e.duration / 1000)} сек в ${e.timestamp})`).join("\n");
     const advice = await getAdvice(goals, recent);
-    notyf.open({ type: "info", message: advice });
+    showToast( advice );
     audio.play().catch(() => {});
     await addChatMessage("AI", advice);
     lastAdviceTime = now;
@@ -319,6 +315,8 @@ async function maybeAdviseUser() {
       currentDomain = getDomain(location.href);
       createElements();
     }
+    console.log('maybeAdviseUser called ');
+    if(!document.hasFocus()) return
     maybeAdviseUser();
   }, 10000);
 })();
