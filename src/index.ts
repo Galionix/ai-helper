@@ -18,12 +18,21 @@ const notyf = new Notyf({
 
 const audio = new Audio("https://proxy.notificationsounds.com/notification-sounds/confident-543/download/file-sounds-1083-confident.mp3");
 
-function el(tag, options = {}) {
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, options: {
+  id?: string,
+  className?: string,
+  textContent?: string,
+  placeholder?: string,
+  dataset?: Record<string, string>,
+  children?: HTMLElement[],
+  listeners?: Record<string, EventListenerOrEventListenerObject>,
+  style?: Partial<CSSStyleDeclaration>,
+} = {}): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag);
   if (options.id) element.id = options.id;
   if (options.className) element.className = options.className;
   if (options.textContent) element.textContent = options.textContent;
-  if (options.placeholder) element.placeholder = options.placeholder;
+  if (options.placeholder) (element as HTMLInputElement).placeholder = options.placeholder;
   if (options.dataset) Object.entries(options.dataset).forEach(([k, v]) => element.dataset[k] = v);
   if (options.children) element.append(...options.children);
   if (options.listeners) Object.entries(options.listeners).forEach(([k, v]) => element.addEventListener(k, v));
@@ -52,7 +61,7 @@ const CSS = `
 
 GM_addStyle(CSS);
 
-async function addChatMessage(sender, text) {
+async function addChatMessage(sender:string, text:string) {
   const raw = await GM_getValue("chat", "[]");
   const chat = JSON.parse(raw);
   console.log('chat: ', chat);
@@ -60,12 +69,21 @@ async function addChatMessage(sender, text) {
   await GM_setValue("chat", JSON.stringify(chat));
   renderChat();
 }
-
+type Message = {
+  time: string
+  sender: string
+  text: string
+}
+type Event = {
+  domain: string
+  timestamp: string
+  duration: number
+}
 async function renderChat() {
   const container = document.getElementById("ai-helper-chat-messages");
   if (!container) return;
   const raw = await GM_getValue("chat", "[]");
-  const chat = JSON.parse(raw);
+  const chat:Message[] = JSON.parse(raw);
   container.textContent = "";
   chat.slice(-50).forEach(msg => {
     container.append(el("div", {
@@ -103,6 +121,7 @@ function createElements() {
       },
       listeners: {
         keydown: (e) => {
+          // @ts-ignore
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             sendUserMessage();
@@ -137,7 +156,7 @@ function createElements() {
           id: "ai-helper-chat",
           className: "ai-helper-content",
           children: [
-            el("div", { id: "ai-helper-chat-messages", style: { flex: 1, overflowY: "auto", marginBottom: "10px" } }),
+            el("div", { id: "ai-helper-chat-messages", style: { flex: '1', overflowY: "auto", marginBottom: "10px" } }),
             messageInput,
             sendBtn
           ]
@@ -193,7 +212,7 @@ function toggleWidget() {
   widget.style.display = widget.style.display === "none" ? "flex" : "none";
 }
 
-function getDomain(url) {
+function getDomain(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "unknown"; }
 }
 
@@ -201,7 +220,7 @@ async function renderStats() {
   const container = document.getElementById("ai-helper-stats-list");
   if (!container) return;
   const raw = await GM_getValue("eventLog", "[]");
-  const events = JSON.parse(raw);
+  const events: Event[] = JSON.parse(raw);
   container.textContent = "";
   if (events.length === 0) {
     container.append(el("p", { textContent: "Нет данных" }));
@@ -211,6 +230,7 @@ async function renderStats() {
     container.append(el("div", {
       children: [
         el("b", { textContent: entry.domain }),
+        // @ts-ignore
         document.createTextNode(` — ${entry.timestamp} (${Math.round(entry.duration / 1000)} сек)`)
       ]
     }));
@@ -230,7 +250,7 @@ async function logSessionEnd() {
 }
 
 let lastAdviceTime = Date.now();
-async function getAdvice(goals, recentEvents) {
+async function getAdvice(goals: string, recentEvents: string) {
   const key = await GM_getValue("openai_key", "");
   if (!key) return "API ключ не задан";
   const messages = [
@@ -256,7 +276,7 @@ async function maybeAdviseUser() {
   const now = Date.now();
   if (now - lastAdviceTime > interval) {
     const raw = await GM_getValue("eventLog", "[]");
-    const events = JSON.parse(raw).slice(-5);
+    const events: Event[] = JSON.parse(raw).slice(-5);
     const recent = events.map(e => `${e.domain} (${Math.round(e.duration / 1000)} сек в ${e.timestamp})`).join("\n");
     const advice = await getAdvice(goals, recent);
     notyf.open({ type: "info", message: advice });
@@ -314,7 +334,7 @@ async function sendUserMessage() {
   const userMessage = input.value.trim();
   input.value = "";
 
-  const chat = JSON.parse(raw);
+  const chat: Message[] = JSON.parse(raw);
   const recent = chat.slice(-5).map(m => ({
     role: m.sender === "AI" ? "assistant" : "user",
     content: m.text
